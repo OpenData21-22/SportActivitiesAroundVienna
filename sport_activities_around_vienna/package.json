@@ -1,0 +1,17 @@
+{
+  "name": "sport_activities_around_vienna",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "map.js",
+  "scripts": {
+    "start": "php -S localhost:100",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "leaflet": "^1.8.0"
+  }
+}
