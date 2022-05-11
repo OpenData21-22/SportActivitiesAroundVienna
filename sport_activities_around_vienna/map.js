@@ -33,6 +33,7 @@ async function fetchSportsData() {
 
     async function fillSportsData() {
         await fetchSportsData();
+        cleanJsonData(sportsJSONData)
 
         sportsJSONData.features.forEach(feature => {
             let coordinates = feature.geometry.coordinates;
@@ -59,4 +60,16 @@ async function fetchSportsData() {
             date: new Date(),
             data: jsonData
         }));
+    }
+
+    function cleanJsonData(jsonData) {
+        jsonData.features.forEach(feature => {
+            let sportstaettenArt = feature.properties.SPORTSTAETTEN_ART;
+            //remove all html tags
+            sportstaettenArt = sportstaettenArt.replaceAll(/(<.*?>)/g, " ");
+        })
+    }
+
+    function calculateLookupTable() {
+
     }
