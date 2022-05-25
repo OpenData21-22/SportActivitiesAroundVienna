@@ -20,7 +20,7 @@ async function fetchSportsData() {
         let dateOfSaving = Date.parse(fetchedJSONData.date);
         let currentDate = new Date();
         let timeDifference = currentDate - dateOfSaving;
-        let differenceInDays =  timeDifference / (1000 * 3600 * 24);
+        let differenceInDays = timeDifference / (1000 * 3600 * 24);
 
         if (differenceInDays < 7) return;
     }
@@ -31,45 +31,58 @@ async function fetchSportsData() {
     writeToFile("SportstaettenData.json", sportsJSONData);
 }
 
-    async function fillSportsData() {
-        await fetchSportsData();
-        cleanJsonData(sportsJSONData)
+async function fillSportsData() {
+    await fetchSportsData();
+    cleanJsonData(sportsJSONData)
 
-        sportsJSONData.features.forEach(feature => {
-            let coordinates = feature.geometry.coordinates;
-            let type = feature.geometry.type;
-            let properties = feature.properties;
+    sportsJSONData.features.forEach(feature => {
+        let coordinates = feature.geometry.coordinates;
+        let type = feature.geometry.type;
+        let properties = feature.properties;
 
-            if (type === "Point") {
-                let marker = L.marker([coordinates[1], coordinates[0]]).addTo(map);
-                marker.bindPopup(`
+        if (type === "Point") {
+            let marker = L.marker([coordinates[1], coordinates[0]]).addTo(map);
+            marker.bindPopup(`
             Kategorie: ${properties.KATEGORIE_TXT}<br>
             Addresse: ${properties.ADRESSE}<br>
             Website: <a href="${properties.WEBLINK1}">${properties.WEBLINK1}</a>`);
-            }
-        })
-    }
+        }
+    })
+}
 
-    function writeToFile(fileName, jsonData) {
-        let xmlHttpRequest = new XMLHttpRequest();
-        xmlHttpRequest.open("POST", "/persistence.php", true);
-        xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
+function writeToFile(fileName, jsonData) {
+    let xmlHttpRequest = new XMLHttpRequest();
+    xmlHttpRequest.open("POST", "/persistence.php", true);
+    xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
 
-        xmlHttpRequest.send(JSON.stringify({
-            fileName: fileName,
-            date: new Date(),
-            data: jsonData
-        }));
-    }
+    xmlHttpRequest.send(JSON.stringify({
+        fileName: fileName,
+        date: new Date(),
+        data: jsonData
+    }));
+}
 
-    function cleanJsonData(jsonData) {
-        jsonData.features.forEach(feature => {
-            let sportstaettenArt = feature.properties.SPORTSTAETTEN_ART;
-            //remove all html tags
-            sportstaettenArt = sportstaettenArt.replaceAll(/(<.*?>)/g, " ");
-        })
-    }
+function cleanJsonData(jsonData) {
+    jsonData.features.forEach(feature => {
+        let sportstaettenArt = feature.properties.SPORTSTAETTEN_ART;
+        //remove all html tags
+        sportstaettenArt = sportstaettenArt.replaceAll(/(?<!,\s*)(<.*?>)/g, ","); //Replace all html tags that do not have a leading comma with a comma
+        sportstaettenArt = sportstaettenArt.replaceAll(/(<.*?>)/g, ""); //Replace all html tags with nothing
+        sportstaettenArt = sportstaettenArt.replaceAll(/,(\s)*((?!.+))/g, ""); //Replace all commas that are not followed by a word character with nothing
 
-    function calculateLookupTable() {
+        feature.properties.SPORTSTAETTEN_ART = sportstaettenArt;
+    })
+    calculateLookupTable(jsonData);
+}
 
-    }
+function calculateLookupTable(formattedJsonData) {
+    let categories = new Map();
+
+    formattedJsonData.features.forEach(feature => {
+        feature.properties.SPORTSTAETTEN_ART.split(',').forEach(category => {
+            if (categories[category]) categories[category]++;
+            else categories[category] = 1;
+        });
+    })
+    console.log(categories);
+}
