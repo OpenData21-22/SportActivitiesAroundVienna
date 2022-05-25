@@ -69,6 +69,8 @@ function cleanJsonData(jsonData) {
         sportstaettenArt = sportstaettenArt.replaceAll(/(?<!,\s*)(<.*?>)/g, ","); //Replace all html tags that do not have a leading comma with a comma
         sportstaettenArt = sportstaettenArt.replaceAll(/(<.*?>)/g, ""); //Replace all html tags with nothing
         sportstaettenArt = sportstaettenArt.replaceAll(/,(\s)*((?!.+))/g, ""); //Replace all commas that are not followed by a word character with nothing
+        sportstaettenArt = sportstaettenArt.replaceAll(/^(?<!.+)\n/g, ""); //Replace all commas that are not followed by a word character with nothing
+        sportstaettenArt = sportstaettenArt.replaceAll(/\n/g, ","); //Replace all commas that are not followed by a word character with nothing
 
         feature.properties.SPORTSTAETTEN_ART = sportstaettenArt;
     })
@@ -80,7 +82,12 @@ function calculateLookupTable(formattedJsonData) {
 
     formattedJsonData.features.forEach(feature => {
         feature.properties.SPORTSTAETTEN_ART.split(',').forEach(category => {
-            if (categories[category]) categories[category]++;
+            let removedNumber = category.match(/\d+(?!-)/)
+            category = category.replace(/\d+(?!-)/, "");
+            category = category.trim();
+
+            console.log();
+            if (categories[category]) categories[category] += removedNumber ? parseInt(removedNumber[0]) : 1;
             else categories[category] = 1;
         });
     })
