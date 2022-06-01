@@ -7,7 +7,9 @@
     <script src="node_modules/leaflet/dist/leaflet.js"></script>
 </head>
 <body>
+<table id="filter-table">
 
+</table>
 <div id="map"></div>
 <script src="map.js"></script>
 </body>

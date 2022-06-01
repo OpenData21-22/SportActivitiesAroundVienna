@@ -4,7 +4,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let sportsUrl = "https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&typeName=ogdwien:SPORTSTAETTENOGD&srsName=EPSG:4326&outputFormat=json"
-let sportsJSONData;
+let sportsJSONData, sportsJSONLookupTable;
 
 fillSportsData();
 
@@ -15,6 +15,7 @@ async function fetchSportsData() {
     if (localRes.ok) {
         let fetchedJSONData = await localRes.json();
         sportsJSONData = fetchedJSONData.data;
+        sportsJSONLookupTable = fetchedJSONData.lookupTable;
 
         //Calculate difference of days between saving and today
         let dateOfSaving = Date.parse(fetchedJSONData.date);
@@ -27,13 +28,16 @@ async function fetchSportsData() {
 
     //Fetch file remotely and persist it.
     let remoteRes = await fetch(sportsUrl);
-    sportsJSONData = await remoteRes.json();
-    writeToFile("SportstaettenData.json", sportsJSONData);
+    fetchedJSONData = await remoteRes.json();
+    sportsJSONData = fetchedJSONData;
+    sportsJSONLookupTable = fetchedJSONData.lookupTable;
+
+    cleanJsonData(sportsJSONData);
+    writeToFile("SportstaettenData.json", sportsJSONData, sportsJSONLookupTable);
 }
 
 async function fillSportsData() {
     await fetchSportsData();
-    cleanJsonData(sportsJSONData)
 
     sportsJSONData.features.forEach(feature => {
         let coordinates = feature.geometry.coordinates;
@@ -50,7 +54,7 @@ async function fillSportsData() {
     })
 }
 
-function writeToFile(fileName, jsonData) {
+function writeToFile(fileName, jsonData, lookupTable) {
     let xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/persistence.php", true);
     xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
@@ -58,19 +62,21 @@ function writeToFile(fileName, jsonData) {
     xmlHttpRequest.send(JSON.stringify({
         fileName: fileName,
         date: new Date(),
-        data: jsonData
+        data: jsonData,
+        lookupTable: lookupTable
     }));
 }
 
 function cleanJsonData(jsonData) {
+    //TODO: Move to php
     jsonData.features.forEach(feature => {
         let sportstaettenArt = feature.properties.SPORTSTAETTEN_ART;
         //remove all html tags
         sportstaettenArt = sportstaettenArt.replaceAll(/(?<!,\s*)(<.*?>)/g, ","); //Replace all html tags that do not have a leading comma with a comma
         sportstaettenArt = sportstaettenArt.replaceAll(/(<.*?>)/g, ""); //Replace all html tags with nothing
         sportstaettenArt = sportstaettenArt.replaceAll(/,(\s)*((?!.+))/g, ""); //Replace all commas that are not followed by a word character with nothing
-        sportstaettenArt = sportstaettenArt.replaceAll(/^(?<!.+)\n/g, ""); //Replace all commas that are not followed by a word character with nothing
-        sportstaettenArt = sportstaettenArt.replaceAll(/\n/g, ","); //Replace all commas that are not followed by a word character with nothing
+        sportstaettenArt = sportstaettenArt.replaceAll(/^(?<!.+)\n/g, ""); //Replace all \n that are not lead by a character with nothing
+        sportstaettenArt = sportstaettenArt.replaceAll(/\n/g, ","); //Replace all \n with a comma nothing
 
         feature.properties.SPORTSTAETTEN_ART = sportstaettenArt;
     })
@@ -78,18 +84,21 @@ function cleanJsonData(jsonData) {
 }
 
 function calculateLookupTable(formattedJsonData) {
-    let categories = new Map();
+    //TODO: Move to php
+    sportPlaceExtensions = ["Platz", "Plätze", "Halle", "Hallen", "Anlage", "Anlagen", "Feld", "Felder", "Lift", "Stadion"];
+    sportsJSONLookupTable = new Map();
 
-    formattedJsonData.features.forEach(feature => {
+    formattedJsonData.features.forEach((feature, index) => {
         feature.properties.SPORTSTAETTEN_ART.split(',').forEach(category => {
-            let removedNumber = category.match(/\d+(?!-)/)
+            category = category.replaceAll(/(\s*?\d*?\s*?)m²/g, ""); //Replace all m² and corresponding symbols with nothing
+
             category = category.replace(/\d+(?!-)/, "");
             category = category.trim();
 
-            console.log();
-            if (categories[category]) categories[category] += removedNumber ? parseInt(removedNumber[0]) : 1;
-            else categories[category] = 1;
+            if (sportsJSONLookupTable[category]) {
+                sportsJSONLookupTable[category].push(index);
+            }
+            else sportsJSONLookupTable[category] = [index];
         });
     })
-    console.log(categories);
 }
