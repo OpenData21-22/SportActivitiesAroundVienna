@@ -15,15 +15,19 @@
 
     <div id="filter-table">
         <label for="indoor-outdoor-selector">Indoor / Outdoor: </label>
-        <select id="indoor-outdoor-selector" onchange="fillSportsData()">
+        <select id="indoor-outdoor-selector" onchange="fillSportsData(null)">
             <option>Keine Angabe</option>
             <option>Indoor</option>
             <option>Outdoor</option>
         </select>
+
         <div class="spacer"></div>
         <label for="sport-type-selector">Sportart: </label>
-        <select id="sport-type-selector" onchange="fillSportsData()">
-        </select>
+        <select id="sport-type-selector" onchange="fillSportsData(true)"></select>
+
+        <div class="spacer"></div>
+        <label for="all-sport-type-selector">Sonstige Sportarten</label>
+        <select id="all-sport-type-selector" onchange="fillSportsData(false)"></select>
     </div>
 </div>
 <script src="map.js"></script>

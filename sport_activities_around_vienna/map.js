@@ -4,15 +4,19 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let sportsUrl = "https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&typeName=ogdwien:SPORTSTAETTENOGD&srsName=EPSG:4326&outputFormat=json"
-let sportsJSONData, sportsJSONLookupTable;
+let sportsJSONData, cleanedSportsJSONLookupTable, sportsJSONLookupTable;
 let sportsJSONDataKey = "sportsJSONDataKey";
-let sportsJSONLookupTableKey = "sportsJSONLookupTable";
+let cleanedSportsJSONLookupTableKey = "cleanedSportsJSONLookupTable";
+let sportsJSONLookupTableKey = "sportsJSONLookupTableKey";
+
+let nullSelectorValue = "Bitte wählen";
 
 displayFilter();
 
 async function fetchSportsData() {
     let localStorageSaveCode = () => {
         localStorage.setItem(sportsJSONDataKey, JSON.stringify(sportsJSONData));
+        localStorage.setItem(cleanedSportsJSONLookupTableKey, JSON.stringify(cleanedSportsJSONLookupTable));
         localStorage.setItem(sportsJSONLookupTableKey, JSON.stringify(sportsJSONLookupTable));
     }
 
@@ -22,6 +26,7 @@ async function fetchSportsData() {
     if (localRes.ok) {
         let fetchedJSONData = await localRes.json();
         sportsJSONData = fetchedJSONData.data;
+        cleanedSportsJSONLookupTable = fetchedJSONData.cleanedLookupTable;
         sportsJSONLookupTable = fetchedJSONData.lookupTable;
 
         //Calculate difference of days between saving and today
@@ -39,34 +44,39 @@ async function fetchSportsData() {
     let remoteRes = await fetch(sportsUrl);
     fetchedJSONData = await remoteRes.json();
     sportsJSONData = fetchedJSONData;
+    cleanedSportsJSONLookupTable = fetchedJSONData.lookupTable;
     sportsJSONLookupTable = fetchedJSONData.lookupTable;
-
     cleanJsonData(sportsJSONData);
-    writeToFile("SportstaettenData.json", sportsJSONData, sportsJSONLookupTable);
+    writeToFile("SportstaettenData.json");
 
     localStorageSaveCode();
 }
 
-async function fillSportsData() {
+async function fillSportsData(isCleanedData) {
+    if (isCleanedData === null) {
+        isCleanedData = document.getElementById("all-sport-type-selector").value === nullSelectorValue;
+    }
     Object.entries(map._layers).forEach((layer, index) => {
         if (index != 0) {
             map.removeLayer(layer[1]);
         }
     })
     sportsJSONData = JSON.parse(localStorage.getItem(sportsJSONDataKey));
-    sportsJSONLookupTable = JSON.parse(localStorage.getItem(sportsJSONLookupTableKey));
+    let lookupTable = JSON.parse(localStorage.getItem(isCleanedData ? cleanedSportsJSONLookupTableKey : sportsJSONLookupTableKey));
 
-    if (!sportsJSONData || !sportsJSONLookupTable) {
+    if (!sportsJSONData || !lookupTable) {
         alert("Data is not yet loaded!");
         return;
     }
 
     let indoorOutdoor = document.getElementById("indoor-outdoor-selector").value.toLowerCase();
-    let sportType = document.getElementById("sport-type-selector").value;
-    let features = [];
-    if (sportType === "Bitte wählen") return;
+    let sportType = document.getElementById(isCleanedData ? "sport-type-selector" : "all-sport-type-selector").value;
+    document.getElementById(isCleanedData ? "all-sport-type-selector" : "sport-type-selector").value = nullSelectorValue;
 
-    sportsJSONLookupTable[sportType].forEach(tableIndex => {
+    let features = [];
+    if (sportType === nullSelectorValue) return;
+
+    lookupTable[sportType].forEach(tableIndex => {
         let feature = sportsJSONData.features[tableIndex];
         if (indoorOutdoor === "keine angabe" || feature.properties.KATEGORIE_TXT.includes(indoorOutdoor)) {
             features.push(feature)
@@ -90,27 +100,34 @@ async function fillSportsData() {
 }
 
 async function displayFilter() {
-    await fetchSportsData();
-    let output = "<option>Bitte wählen</option>"
+    const outputGenerator = (lookupTable) => {
+        let output = `<option>${nullSelectorValue}</option>`
 
-    Object.keys(sportsJSONLookupTable).forEach(key => {
-        output += `<option>${key}</option>`;
-    })
+        Object.keys(lookupTable).forEach(key => {
+            output += `<option>${key}</option>`;
+        })
+        return output;
+    }
+    await fetchSportsData();
+
 
     let sportTypeSelector = document.getElementById("sport-type-selector");
-    sportTypeSelector.innerHTML = output;
+    sportTypeSelector.innerHTML = outputGenerator(cleanedSportsJSONLookupTable);
+
+    let allSportTypeSelector = document.getElementById("all-sport-type-selector");
+    allSportTypeSelector.innerHTML = outputGenerator(sportsJSONLookupTable);
 }
 
-function writeToFile(fileName, jsonData, lookupTable) {
+function writeToFile(fileName) {
     let xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/persistence.php", true);
     xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
-    console.log(lookupTable);
     xmlHttpRequest.send(JSON.stringify({
         fileName: fileName,
         date: new Date(),
-        data: jsonData,
-        lookupTable: lookupTable
+        data: sportsJSONData,
+        cleanedLookupTable: cleanedSportsJSONLookupTable,
+        lookupTable: sportsJSONLookupTable
     }));
 }
 
@@ -149,6 +166,7 @@ function calculateLookupTable(formattedJsonData) {
     }
     //It is important to lead with the more specific sport (Tischtennis before Tennis) for the matching to work properly.
     sportKinds = ["Badminton", "Basketball", "Volleyball", "Handball", "Rasenpl", "Fitness", "Kletter", "Leichtathletik", "Hartpl", "Tischtennis", "Tennis", "Budo", "Turnen", "Bowling", "Squash", "Minigolf", "Golf", "Fußball", "Fussball", "Pool", "Billard", "Soccer", "Kegel", "Reit", "Eissport", "Inline", "Turn", "Hundesport", "Fittness"];
+    cleanedSportsJSONLookupTable = new Map();
     sportsJSONLookupTable = new Map();
 
     formattedJsonData.features.forEach((feature, index) => {
@@ -160,13 +178,20 @@ function calculateLookupTable(formattedJsonData) {
             let sportKind = sportKinds.find(sportKind => category.toLowerCase().includes(sportKind.toLowerCase()));
             if (sportKind) {
                 if (replaceNameArray[sportKind]) sportKind = replaceNameArray[sportKind];
-                if (sportsJSONLookupTable[sportKind]) {
-                    sportsJSONLookupTable[sportKind].push(index);
-                } else sportsJSONLookupTable[sportKind] = [index];
+                if (cleanedSportsJSONLookupTable[sportKind]) {
+                    cleanedSportsJSONLookupTable[sportKind].push(index);
+                } else cleanedSportsJSONLookupTable[sportKind] = [index];
             }
-
+            if (sportsJSONLookupTable[category]) {
+                sportsJSONLookupTable[category].push(index);
+            } else sportsJSONLookupTable[category] = [index];
         });
     })
+
+    cleanedSportsJSONLookupTable = Object.keys(cleanedSportsJSONLookupTable).sort().reduce((result, key) => {
+        result[key] = cleanedSportsJSONLookupTable[key];
+        return result;
+    }, {});
 
     sportsJSONLookupTable = Object.keys(sportsJSONLookupTable).sort().reduce((result, key) => {
         result[key] = sportsJSONLookupTable[key];
