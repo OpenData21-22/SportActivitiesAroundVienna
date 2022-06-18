@@ -122,6 +122,7 @@ function writeToFile(fileName) {
     let xmlHttpRequest = new XMLHttpRequest();
     xmlHttpRequest.open("POST", "/persistence.php", true);
     xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
+
     xmlHttpRequest.send(JSON.stringify({
         fileName: fileName,
         date: new Date(),
@@ -132,7 +133,6 @@ function writeToFile(fileName) {
 }
 
 function cleanJsonData(jsonData) {
-    //TODO: Move to php
     jsonData.features.forEach(feature => {
         let sportstaettenArt = feature.properties.SPORTSTAETTEN_ART;
         //remove all html tags
@@ -148,9 +148,7 @@ function cleanJsonData(jsonData) {
 }
 
 function calculateLookupTable(formattedJsonData) {
-    //TODO: Move to php
-    //Tennis, Wasser
-    replaceNameArray = {
+    const replaceNameArray = {
         Rasenpl: "Rasenplatz",
         Hartpl: "Hartplatz",
         Budo: "Budosportarten",
@@ -164,37 +162,41 @@ function calculateLookupTable(formattedJsonData) {
         Fittness: "Fitness",
         Turn: "Turnen"
     }
+
+    const addToLookupTable = (category, lookupTable, index) => {
+        if (lookupTable[category]) {
+            lookupTable[category].push(index);
+        } else lookupTable[category] = [index];
+    }
     //It is important to lead with the more specific sport (Tischtennis before Tennis) for the matching to work properly.
-    sportKinds = ["Badminton", "Basketball", "Volleyball", "Handball", "Rasenpl", "Fitness", "Kletter", "Leichtathletik", "Hartpl", "Tischtennis", "Tennis", "Budo", "Turnen", "Bowling", "Squash", "Minigolf", "Golf", "Fußball", "Fussball", "Pool", "Billard", "Soccer", "Kegel", "Reit", "Eissport", "Inline", "Turn", "Hundesport", "Fittness"];
+    const sportKinds = ["Badminton", "Basketball", "Volleyball", "Handball", "Rasenpl", "Fitness", "Kletter", "Leichtathletik", "Hartpl", "Tischtennis", "Tennis", "Budo", "Turnen", "Bowling", "Squash", "Minigolf", "Golf", "Fußball", "Fussball", "Pool", "Billard", "Soccer", "Kegel", "Reit", "Eissport", "Inline", "Turn", "Hundesport", "Fittness"];
     cleanedSportsJSONLookupTable = new Map();
     sportsJSONLookupTable = new Map();
 
     formattedJsonData.features.forEach((feature, index) => {
         feature.properties.SPORTSTAETTEN_ART.split(',').forEach(category => {
+            //<editor-fold desc="Cleaning categories">
             category = category.replaceAll(/(\s*?\d*?\s*?)m²/g, ""); //Replace all m² and corresponding symbols with nothing
-
             category = category.replace(/\d+(?!-)/, "");
             category = category.trim();
+            //</editor-fold>
+
             let sportKind = sportKinds.find(sportKind => category.toLowerCase().includes(sportKind.toLowerCase()));
             if (sportKind) {
                 if (replaceNameArray[sportKind]) sportKind = replaceNameArray[sportKind];
-                if (cleanedSportsJSONLookupTable[sportKind]) {
-                    cleanedSportsJSONLookupTable[sportKind].push(index);
-                } else cleanedSportsJSONLookupTable[sportKind] = [index];
+                addToLookupTable(sportKind, cleanedSportsJSONLookupTable, index)
             }
-            if (sportsJSONLookupTable[category]) {
-                sportsJSONLookupTable[category].push(index);
-            } else sportsJSONLookupTable[category] = [index];
+            addToLookupTable(category, sportsJSONLookupTable, index)
         });
     })
 
-    cleanedSportsJSONLookupTable = Object.keys(cleanedSportsJSONLookupTable).sort().reduce((result, key) => {
-        result[key] = cleanedSportsJSONLookupTable[key];
-        return result;
-    }, {});
+    const sortLookupTable = (lookupTable) => {
+        lookupTable = Object.keys(lookupTable).sort().reduce((result, key) => {
+            result[key] = lookupTable[key];
+            return result;
+        }, {});
+    }
 
-    sportsJSONLookupTable = Object.keys(sportsJSONLookupTable).sort().reduce((result, key) => {
-        result[key] = sportsJSONLookupTable[key];
-        return result;
-    }, {});
+    sortLookupTable(cleanedSportsJSONLookupTable);
+    sortLookupTable(sportsJSONLookupTable);
 }
