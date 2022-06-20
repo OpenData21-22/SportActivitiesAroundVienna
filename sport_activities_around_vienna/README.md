@@ -4,7 +4,7 @@ Project members: Paul Renkel, Kaya Löher
 ## Idea
 This project aims to give you information about all sport activities/places that are in Vienna.
 Therefore we use data from wien.gv.at:
-- TO-DO include dataset
+- https://www.data.gv.at/katalog/dataset/stadt-wien_sportstttenwien 
 
 ## Technologies
 We use Javascript to load and work with the provided JSON Data and PHP to persist the data.
