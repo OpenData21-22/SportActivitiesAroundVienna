@@ -11,6 +11,7 @@ We use Javascript to load and work with the provided JSON Data and PHP to persis
 
 ## How to use this app
 This javascript application is easy to use:
+- create "resources" folder in project root
 - install node modules via ``npm i``
 - configure your webserver
 - call ``npm start``
